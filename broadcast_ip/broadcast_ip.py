@@ -1,6 +1,5 @@
 import time
 from socket import *
-import netifaces as ni
 
 fd = socket(AF_INET, SOCK_DGRAM)  
 fd.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)  
