@@ -1,0 +1,2 @@
+This tool should be run when your machine boot. It will broadcast a "Hello world" string at UDP port 50022. You can use wireshark and listen this UDP port.
+For some device that you cannot know the IP address after it boots. i.e: Raspberry Pi
