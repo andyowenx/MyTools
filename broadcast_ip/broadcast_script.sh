@@ -1,4 +1,11 @@
 #!/bin/bash
+### BEGIN INIT INFO
+# Provides:          owen
+# Default-Start:     2 3 4 5
+# Default-Stop:
+# Short-Description: Broadcast device IP
+# Description:       It will auto broadcast device IP to UDP port 50022
+### END INIT INFO
 
 start() {
 	/root/broadcast_ip.py
