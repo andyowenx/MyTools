@@ -168,6 +168,9 @@ def url_scan(argument):
 	    if another_page is None: #Cannot find href in <a>
 		continue
 
+	    if "search" in another_page:
+		continue
+
 	    if 'http://' not in another_page and 'https://' not in another_page:
 		if another_page[0] == '/':
 		    another_page = basic_url + another_page
