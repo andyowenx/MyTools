@@ -2,20 +2,22 @@ import requests
 import argparse
 import threading
 from bs4 import BeautifulSoup
+import datetime
 import time
 
 #debug level:
 # 1=> basic message
 # 2=> ALL message (include HTML source code)
-debug=1
+debug=0
 
 mutex = threading.Lock()
 
-def scan_data(url, timeout):
+def scan_data(url, timeout, account_list):
     try:
 	data = requests.get(url, timeout = timeout, cookies={'over18': '1'}, verify=True)
     except requests.Timeout as e:
-        raise errors.TransientDriverError("scan_data request timeout, error : %s" % str(e))
+        print "scan_data request timeout, error : " + str(e) +" , url = "+str(url)
+	return
 
     if 'text/' not in data.headers['Content-Type']: #Content-Type
 	if debug > 0:
@@ -25,17 +27,34 @@ def scan_data(url, timeout):
     soup=BeautifulSoup(data.text.encode('utf-8'),'html.parser')
     if debug > 1:
 	print soup.prettify()  
-    for content in soup.find_all('a'):
-	if str(content.get('class'))[20:] == 'author may-blank id-':
-	    print content.get_text()
+
+    #author
+    author_data = soup.find('span', class_='article-meta-value')
+    author_data=str(author_data)
+    tmp_ptr=author_data.find('>')
+    author=author_data[tmp_ptr+1:author_data.find(' ',tmp_ptr)]
+    if author not in account_list:
+	account_list[author]=0
+    account_list[author]+=1
+
+    #reply
+    for content in soup.find_all('span', class_= 'f3 hl push-userid'):
+	username = content.get_text()
+	if username not in account_list:
+	    account_list[username]=0
+	account_list[username]+=1
 	
 
 def crawl(myitem):
 
-    time.sleep(3) #sleep 5 second first to let main_scan find some website
+    time.sleep(3) #sleep 3 second first to let url_scan find some website
     sleep_count=0
+    crawl_count=0
 
     while True:
+	if crawl_count % 50 == 0 and crawl_count != 0:
+	    print "Still "+str(len(myitem['url']))+" in Thread "+str(myitem['index'])
+
 	target_url = ""
 	mutex.acquire()
 	try:
@@ -62,10 +81,12 @@ def crawl(myitem):
 	    print "Thread "+str(myitem['index'])+" : " + target_url
 
 	#start to scan the data we need
-	scan_data(target_url, myitem['timeout'])
+	scan_data(target_url, myitem['timeout'], myitem['account_list'])
+
+	crawl_count +=1
     
 
-def main_scan(argument):
+def url_scan(argument):
 
     scanned_list={}
     url=[]
@@ -73,7 +94,8 @@ def main_scan(argument):
     try:
 	tmp_data = requests.get(argument['add_url'], timeout = argument['timeout'], cookies={'over18': '1'}, verify=True)
     except requests.Timeout as e:
-        raise errors.TransientDriverError("First request timeout, error : %s" % str(e))
+        print "First request timeout, error : " +str(e)+" , url = "+str(url)
+	return
 
     tmp_string=tmp_data.url.split('/')
     root_url = tmp_string[2]
@@ -99,6 +121,7 @@ def main_scan(argument):
 	thread_item[i]['timeout']=argument['timeout']
 	thread_item[i]['sleep_limit']=argument['sleep_limit']
 	thread_item[i]['sleep_time']=argument['sleep_time']
+	thread_item[i]['account_list']={}
 	t = threading.Thread(target=crawl, args=(thread_item[i],))
 	thread.append(t)
 
@@ -116,16 +139,19 @@ def main_scan(argument):
 	else: 
 	    break
 
+	if page_count % 50 ==0 and page_count != 0:
+	    print "Already scan "+str(page_count)+" pages."
 	
 	#scan if there any other url we can find in this website
 	try:
 	    data = requests.get(target_url, timeout = timeout, cookies={'over18': '1'}, verify=True)
 	except requests.Timeout as e:
-	    raise errors.TransientDriverError("main_scan request timeout, error : %s" % str(e))
+	    print "url_scan request timeout, error : "+str(e) + " , url = "+str(target_url)
+	    continue
 
 	if 'text/' not in data.headers['Content-Type']: #Content-Type
 	    if debug > 0:
-		print "Content-Type is not text/html, "+ data.headers['Content-Type'] +" ,main_scan shift to next url"
+		print "Content-Type is not text/html, "+ data.headers['Content-Type'] +" ,url_scan shift to next url"
 	    continue
 	else:
 	    soup=BeautifulSoup(data.text.encode('utf-8'),'html.parser')
@@ -171,14 +197,42 @@ def main_scan(argument):
 	    mutex.release()
 
 	page_count+=1
-	
+    
+    #write url list to file
+    urllist_file=open(argument['urllist_filename'],'w')
+    sorted_url=sorted(url)
+    for content in sorted_url:
+	urllist_file.write(content+"\n")
+    urllist_file.close()
+
+    print "url scan finish, it scans "+str(page_count)+" urls"
+
+    #wait for all thread end
     for i in range(0,thread_number):
 	thread[i].join()
 
+    #merge the account list in every threads
+    account_merge={}
+    for i in range(0, thread_number):
+	for key,value in thread_item[i]['account_list'].iteritems():
+	    if key not in account_merge:
+		account_merge[key]=0
+	    account_merge[key]+=value
+	#release the memory
+	thread_item[i]['account_list']={}
 
+    #write account to file
+    account_file=open(argument['account_filename'],'w')
+    for key,value in account_merge.iteritems():
+	account_file.write(str(key)+" : "+str(value)+"\n")
 
+    account_file.close()
 
 if __name__ == "__main__":
+    date=str(datetime.datetime.now())
+    default_account_filename=date[:19]+"-account"
+    default_scan_url_filename=date[:19]+"-urllist"
+
     parser = argparse.ArgumentParser()
     parser.add_argument('-a', '--add-url', required=True, help='The website url you want to crawler.')
     parser.add_argument('-t', '--timeout', type=int, default=5, help='Timeout for a url (second)')
@@ -187,9 +241,11 @@ if __name__ == "__main__":
     parser.add_argument('-l', '--sleep-limit', type=int, default=3, help='Thread idle limits, \
     if set to 0 means limitless')
     parser.add_argument('-s', '--sleep-time', type=int, default=3, help='Thread sleep time')
+    parser.add_argument('--account-filename', default=default_account_filename, help='Filename to save account')
+    parser.add_argument('--urllist-filename', default=default_scan_url_filename, help='Filename to save url list')
     args = vars(parser.parse_args())
 
     if debug > 0:
 	print args   
     
-    main_scan(args)
+    url_scan(args)
