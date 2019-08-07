@@ -1,0 +1,15 @@
+Reverse tool:
+    ghidra	: NSA reverse tool
+    idafree 7.0 : Great reverse if it is pro...
+
+Web crawler:
+    dirbuster	: Guess the folders and files by wordlist
+    IIS-shortname-Scanner   : Scan the aspx, asp...files in a domain. (have to use openjdk-7 to run it)
+    
+Server status:
+    testssl	: Try the TLS version, ssl version, support cipher kinds...Powerful tool.
+    nmap	: You better know this one.
+
+Web attack:
+    burp suite	: Great tool to manual test a website and tamper the request payload.
+
