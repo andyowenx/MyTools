@@ -13,3 +13,7 @@ Server status:
 Web attack:
     burp suite	: Great tool to manual test a website and tamper the request payload.
 
+Wifi:
+    aircrack-ng : WPE, WPA, WPA2, it can handle them.
+
+
