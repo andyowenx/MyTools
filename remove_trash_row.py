@@ -85,5 +85,5 @@ if __name__ == '__main__':
 	    remove_ip_row(csv_row, csv_hash,subnet, csv_writer)
 
     #last write
-    write_csv_file(csv_list, csv_writer)
+    write_csv_file(csv_hash, csv_writer)
     
