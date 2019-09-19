@@ -1,0 +1,5 @@
+#no-jquery
+#no-jquery-ui
+max-pages=1000
+task=16
+url_filename=123
