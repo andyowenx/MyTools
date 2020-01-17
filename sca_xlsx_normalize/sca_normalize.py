@@ -49,7 +49,7 @@ def normalize_path(buf):
 	buf['output'].append(output)
 	item_number+=1
 
-def normalize_vuln(buf):
+def normalize_vuln(buf, rule_buf):
     buf['output']=[]
 
     item_number=1
@@ -84,6 +84,10 @@ def normalize_vuln(buf):
 		#Ignore Info
 		if target_level == "Info.":
 		    break
+		#Ignore exclude rule
+		elif "exclude_list" in rule_buf and target_vuln in rule_buf['exclude_list']:
+		    break
+
 		output = []
 
 		if len(buf['output']) >= 1 and buf['output'][len(buf['output'])-1][1] != target_vuln:
@@ -156,6 +160,7 @@ def main():
     parser.add_argument('-d','--debug_level', type=int, default=3, help='The Debug level, 0 is quite, 1 is error, 2 is information, 3 is debug')
     parser.add_argument('-v', '--vuln_xlsx', type=str, default=None, help='The xlsx file with vulnerabilities from beSOURCE' )
     parser.add_argument('-p', '--path_xlsx', type=str, default=None, help='The xlsx file with path data from beSOURCE')
+    parser.add_argument('-r', '--rule_xlsx', type=str, default=None, help='The xlsx file with exclude vulnerable rules inside')
     parser.add_argument('--rewrite', dest='rewrite', action='store_true', help='If you set this, this program will output the result to the same file name. You will LOSE your original data. CAREFUL')
     parser.set_defaults(rewrite=False)
     parser.add_argument('--vuln_output', type=str, default='vuln_output.xlsx', help='The file name of the result of vulnerabilites, default is vuln_output.xlsx')
@@ -178,6 +183,7 @@ def main():
 	debug_log(func_info[0][3], func_info[0][2], 1, "You did not provide either vuln_xlsx or path_xlsx, program quits")
 	exit(0)
 
+
     if args.rewrite == True:
 	args.vuln_output = args.vuln_xlsx
 	args.path_output = args.path_xlsx
@@ -186,10 +192,20 @@ def main():
 
     vuln_buf={}
     path_buf={}
+    rule_buf={}
 
+    #read the exclude rules
+    if args.rule_xlsx != None and read_xlsx(args.rule_xlsx, rule_buf) != False:
+	rule_buf['exclude_list']={}
+	for row in rule_buf['input'].rows:
+	    exclude_vuln = str(row[0].value).rstrip() #remove the space in the end of string
+	    rule_buf['exclude_list'][exclude_vuln]=1
+
+    #handle vulnerabilities
     if args.vuln_xlsx !=None and read_xlsx(args.vuln_xlsx, vuln_buf) != False:
-	normalize_vuln(vuln_buf)
+	normalize_vuln(vuln_buf, rule_buf)
 	write_xlsx(args.vuln_output, vuln_buf)
+    #handle path
     if args.path_xlsx != None and read_xlsx(args.path_xlsx, path_buf) != False:
 	normalize_path(path_buf)
 	write_xlsx(args.path_output, path_buf)
